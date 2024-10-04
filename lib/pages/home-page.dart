@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:myapp/components/todo-form.dart';
 import 'package:myapp/components/todo-list-item.dart';
+import 'package:http/http.dart' as http;
 
 class HomagePage extends StatefulWidget {
   const HomagePage({super.key});
@@ -9,23 +13,19 @@ class HomagePage extends StatefulWidget {
 }
 
 class _HomagePageState extends State<HomagePage> {
-  final _newTaskTextFieldController = TextEditingController();
+  List todoList = [];
 
-  List todoList = [
-    ["Taks 1", false],
-    ["Task 2", false]
-  ];
-
-  void onCheckboxChanged(index) {
-    setState(() {
-      todoList[index][1] = !todoList[index][1];
-    });
+  @override
+  void initState() {
+    super.initState();
+    fetchTodos();
   }
 
-  void saveNewTask() {
+  void onCheckboxChanged(index) {
+    final updatedStatus = !todoList[index]["is_completed"];
+
     setState(() {
-      todoList.add([_newTaskTextFieldController.text, false]);
-      _newTaskTextFieldController.clear();
+      todoList[index]["is_completed"] = updatedStatus;
     });
   }
 
@@ -39,45 +39,70 @@ class _HomagePageState extends State<HomagePage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
-      body: ListView.builder(
-          itemCount: todoList.length,
-          itemBuilder: (BuildContext context, index) {
-            return TodoListItem(
-              taskTitle: todoList[index][0],
-              isCompleted: todoList[index][1],
-              onChange: (value) => onCheckboxChanged(index),
-            );
-          }),
-      floatingActionButton: Row(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                controller: _newTaskTextFieldController,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.deepPurple.shade200,
-                  border: const OutlineInputBorder(),
-                  enabledBorder: const OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(15)),
-                    borderSide: BorderSide(color: Colors.deepPurple),
-                  ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(15)),
-                    borderSide: BorderSide(color: Colors.deepPurple),
-                  ),
-                  hintText: 'Add a new task',
-                ),
-              ),
-            ),
-          ),
-          FloatingActionButton(
-            onPressed: saveNewTask,
-            child: const Icon(Icons.add),
-          ),
-        ],
+      body: RefreshIndicator(
+        onRefresh: fetchTodos,
+        child: ListView.builder(
+            itemCount: todoList.length,
+            itemBuilder: (BuildContext context, index) {
+              final item = todoList[index] as Map;
+              return TodoListItem(
+                taskId: item["_id"],
+                taskTitle: item["title"],
+                taskDescription: item["description"],
+                isCompleted: item["is_completed"],
+                onChange: (value) => onCheckboxChanged(index),
+                deleteById: (value) => deleteById(item["_id"]),
+                navigateEditTodoForm: () => navigateEditTodoForm(index),
+              );
+            }),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: navigateAddTodoForm,
+        child: const Icon(Icons.add),
       ),
     );
+  }
+
+  void navigateAddTodoForm() {
+    final route = MaterialPageRoute(builder: (context) => const TodoForm());
+    Navigator.push(context, route);
+  }
+
+  void navigateEditTodoForm(index) {
+    Map item = todoList[index];
+    final route = MaterialPageRoute(
+        builder: (context) => TodoForm(
+              todo: item,
+            ));
+    Navigator.push(context, route);
+  }
+
+  ///
+  /// final respone = ["key1": "value1"
+  /// "key1": "value1"]
+  ///
+
+  Future<void> fetchTodos() async {
+    final response = await http
+        .get(Uri.parse("https://api.nstack.in/v1/todos?page=1&limit=10"));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map;
+      final result = data["items"] as List;
+      setState(() {
+        todoList = result;
+      });
+    }
+  }
+
+  Future<void> deleteById(String taskId) async {
+    final url = Uri.parse("https://api.nstack.in/v1/todos/$taskId");
+    final response = await http.delete(url);
+    if (response.statusCode == 200) {
+      final filtered =
+          todoList.where((element) => element["_id"] != taskId).toList();
+      setState(() {
+        todoList = filtered;
+      });
+    }
   }
 }
