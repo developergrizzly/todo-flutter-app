@@ -1,24 +1,37 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:myapp/components/todo-form.dart';
 import 'package:myapp/components/todo-list-item.dart';
 import 'package:http/http.dart' as http;
+import 'package:myapp/pages/sign-in-page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class HomagePage extends StatefulWidget {
-  const HomagePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<HomagePage> createState() => _HomagePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomagePageState extends State<HomagePage> {
+class _HomePageState extends State<HomePage> {
   List todoList = [];
+  String? displayName;
+  final SupabaseClient supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
     fetchTodos();
+    _loadDisplayName();
+  }
+
+  Future<void> _loadDisplayName() async {
+    final name = await getDisplayName();
+    setState(() {
+      displayName = name;
+    });
   }
 
   void onCheckboxChanged(index) {
@@ -38,6 +51,52 @@ class _HomagePageState extends State<HomagePage> {
         centerTitle: true,
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+      ),
+      drawer: Drawer(
+        backgroundColor: Colors.deepPurple.shade300,
+        child: ListView(
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                color: Colors.deepPurple,
+              ),
+              child: Column(
+                children: [
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundImage: AssetImage('assets/images/avatar.png'),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    displayName ?? 'Guest',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              title: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () async {
+                await supabase.auth.signOut();
+                // Check if the widget is still mounted before using the context
+                if (!mounted) return;
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          const SignInPage()), // Replace LoginPage with your actual login page
+                );
+              },
+            ),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: fetchTodos,
@@ -104,5 +163,14 @@ class _HomagePageState extends State<HomagePage> {
         todoList = filtered;
       });
     }
+  }
+
+  Future<String?> getDisplayName() async {
+    final response = await Supabase.instance.client.auth.getUser();
+    final user = response.user;
+    if (user != null) {
+      return user.userMetadata?['full_name'] as String?;
+    }
+    return "Guest";
   }
 }

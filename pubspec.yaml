@@ -37,6 +37,8 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_slidable: ^3.1.1
   http: ^1.2.2
+  supabase_flutter: ^2.0.2
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
